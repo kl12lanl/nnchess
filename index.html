@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Шахматный ИИ</title>
+    <!-- Подключаем стили и библиотеки для доски и логики -->
+    <link rel="stylesheet" href="https://cloudflare.com">
+    <script src="https://jquery.com"></script>
+    <script src="https://cloudflare.com"></script>
+    <script src="https://cloudflare.com"></script>
+    <style>
+        body { font-family: sans-serif; text-align: center; }
+        #board { margin: 20px auto; width: 400px; }
+    </style>
+</head>
+<body>
+
+    <h2>Игра против ИИ (Вы играете за белых)</h2>
+    <div id="board"></div>
+
+<script>
+// 1. Инициализация игры и доски
+var game = new Chess();
+var board = null;
+
+// Ценность фигур для ИИ
+var pieceValues = { p: 10, n: 30, b: 30, r: 50, q: 90, k: 900 };
+
+function evaluateBoard(boardState) {
+    let totalEvaluation = 0;
+    for (let i = 0; i < 8; i++) {
+        for (let j = 0; j < 8; j++) {
+            let piece = boardState[i][j];
+            if (piece) {
+                let value = pieceValues[piece.type];
+                totalEvaluation += (piece.color === 'w' ? value : -value);
+            }
+        }
+    }
+    return totalEvaluation;
+}
+
+// 2. Алгоритм Минимакс с Альфа-Бета отсечением
+function minimax(gameInstance, depth, alpha, beta, isMaximizingPlayer) {
+    if (depth === 0 || gameInstance.game_over()) {
+        return -evaluateBoard(gameInstance.board());
+    }
+
+    var moves = gameInstance.moves();
+    if (isMaximizingPlayer) {
+        let maxEval = -Infinity;
+        for (let move of moves) {
+            gameInstance.move(move);
+            let evaluation = minimax(gameInstance, depth - 1, alpha, beta, false);
+            gameInstance.undo();
+            maxEval = Math.max(maxEval, evaluation);
+            alpha = Math.max(alpha, evaluation);
+            if (beta <= alpha) break;
+        }
+        return maxEval;
+    } else {
+        let minEval = Infinity;
+        for (let move of moves) {
+            gameInstance.move(move);
+            let evaluation = minimax(gameInstance, depth - 1, alpha, beta, true);
+            gameInstance.undo();
+            minEval = Math.min(minEval, evaluation);
+            beta = Math.min(beta, evaluation);
+            if (beta <= alpha) break;
+        }
+        return minEval;
+    }
+}
+
+function calculateBestMove(gameInstance) {
+    var moves = gameInstance.moves();
+    var bestMove = null;
+    var bestValue = -Infinity;
+    var depth = 3; // Глубина просчета
+
+    for (let move of moves) {
+        gameInstance.move(move);
+        var boardValue = minimax(gameInstance, depth - 1, -Infinity, Infinity, false);
+        gameInstance.undo();
+        if (boardValue > bestValue) {
+            bestValue = boardValue;
+            bestMove = move;
+        }
+    }
+    return bestMove;
+}
+
+// 3. Обработка ходов игрока
+function onDragStart(source, piece, position, orientation) {
+    if (game.game_over() || piece.search(/^b/) !== -1) return false;
+}
+
+function makeAIMove() {
+    var bestMove = calculateBestMove(game);
+    if (bestMove) {
+        game.move(bestMove);
+        board.position(game.fen());
+        if (game.game_over()) alert('Игра окончена!');
+    }
+}
+
+function onDrop(source, target) {
+    var move = game.move({
+        from: source,
+        to: target,
+        promotion: 'q' // Автоматическое превращение в ферзя
+    });
+
+    if (move === null) return 'snapback';
+
+    if (game.game_over()) {
+        alert('Игра окончена!');
+    } else {
+        // Ответный ход компьютера через небольшую паузу
+        window.setTimeout(makeAIMove, 250);
+    }
+}
+
+function onSnapEnd() {
+    board.position(game.fen());
+}
+
+// Конфигурация доски
+var config = {
+    draggable: true,
+    position: 'start',
+    onDragStart: onDragStart,
+    onDrop: onDrop,
+    onSnapEnd: onSnapEnd,
+    pieceTheme: 'https://chessboardjs.com{piece}.png'
+};
+
+board = Chessboard('board', config);
+</script>
+</body>
+</html>
